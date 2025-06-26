@@ -1,6 +1,7 @@
 /**
  * Archive any emails found that satisfies the conditions in the Config below.
- * This does NOT delete any emails but helps gather those that are candidates for deletion and add a label to them so that you can review the emails marked before deleting them yourself later.
+ * By default, this does NOT delete any emails but helps gather those that are candidates for deletion and add a label to them so that you can review the emails marked before deleting them yourself later.
+ * You can turn on "move_to_trash" as true in order to delete them.
  * 
  * Google has a 20k limit read/write per day to Gmail messages https://developers.google.com/apps-script/guides/services/quotas
  * Google also doesn't allow the service to take up too much CPU or run for too long https://www.labnol.org/code/suspend-google-script-trigger-200424 
@@ -14,11 +15,12 @@ let Config = {
   "archive_label": "Automated/Archive",               // Label to apply if email is found as a proper candidate for deletion
   "archive_safe_label": "Automated/Archive Safe",     // Label to apply so that we don't repeat our process if an email has already been looked at
   "labels_to_keep": new Set([                         // Don't archive any emails with these labels
-    "Tax",
+    "Taxes",
     "Shopping/Receipt"
   ]),
-  "canArchiveStarred": false,                         // Set to false if you don't want any starred emails to be archived
-  "canArchiveImportant": true,                        // Set to false if you don't want any 'important' marked emails to be archived
+  "can_archive_starred": false,                       // Set to false if you don't want any starred emails to be archived
+  "can_archive_important": true,                      // Set to false if you don't want any 'important' marked emails to be archived
+  "move_to_trash": false,                             // Set to false if you don't want to automatically send archivable emails to trash
 
   // Technical settings
   "batch_size": 100,                                  // Max allowed is 100. If there are less than this amount of emails, this logic will not run. Technically, it's 500 but the size for uploading labels is 100 so that's the bottle neck. It's also about ~30 seconds per 100 emails
@@ -37,15 +39,27 @@ function start() {
   let readCount = 0
   while (readCount < Config.max_emails_read) {
     const emails = getEmails()
+    const threadsToArchive = []
+    const threadsArchiveSafe = []
+
     for (const email of emails) {
-      checkConditions(
+      determineEmailArchivable(
         email,
-        { check: !Config.canArchiveImportant && email.isImportant, reason: "Important" },
-        { check: !Config.canArchiveStarred && email.isStarred, reason: "Starred" },
+        { check: !Config.can_archive_important && email.isImportant, reason: "Important" },
+        { check: !Config.can_archive_starred && email.isStarred, reason: "Starred" },
         { check: email.labels.find(label => Config.labels_to_keep.has(label)) !== undefined, reason: "Keep Label" }
       )
+      email.shouldArchive ? threadsToArchive.push(email.originalThread) : 
+                            threadsArchiveSafe.push(email.originalThread)
     }
-    applyLabels(emails)
+
+    GlobalVars.archiveLabel.addToThreads(threadsToArchive)
+    GlobalVars.archiveSafeLabel.addToThreads(threadsArchiveSafe)
+
+    if (Config.move_to_trash) {
+      threadsToArchive.forEach(x => x.moveToTrash())
+    }
+    
     readCount += emails.length
   }
 }
@@ -58,7 +72,7 @@ function setupGlobalVars() {
   GlobalVars.archiveSafeLabel = getOrCreateLabel(Config.archive_safe_label)
 }
 
-function checkConditions(email, ...conditions) {
+function determineEmailArchivable(email, ...conditions) {
   email.shouldArchive = true
   for (const condition of conditions) {
     if (condition.check) {
@@ -67,20 +81,10 @@ function checkConditions(email, ...conditions) {
       break
     }
   }
+
   if (email.shouldArchive) {
-    console.log(`Will archive '${email.subject}'`)
+    console.log(`Will ${Config.move_to_trash ? "trash" : "archive"} '${email.subject}'`)
   }
-}
-
-function applyLabels(emails) {
-  const threadsToArchive = emails.filter(email => email.shouldArchive).map(email => email.originalThread)
-  const threadsArchiveSafe = emails.filter(email => !email.shouldArchive).map(email => email.originalThread)
-  GlobalVars.archiveLabel.addToThreads(threadsToArchive)
-  GlobalVars.archiveSafeLabel.addToThreads(threadsArchiveSafe)
-
-  // This works below as well but it's 1 at a time so it should be slower
-  // applyLabelToEmail(GlobalVars.archiveLabel, emails.filter(email => email.shouldArchive))
-  // applyLabelToEmail(GlobalVars.archiveSafeLabel, emails.filter(email => !email.shouldArchive))
 }
 
 //////////// Gmail ////////////
