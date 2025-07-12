@@ -6,7 +6,7 @@ A Google Apps Script to automatically apply an archive label to emails that meet
 
 ![labels.png](https://github.com/user-attachments/assets/c3e3cb34-5cfe-4cc4-a976-87a3be5f5cd7)
 
-By defualt, this does **NOT delete** any emails. This is so that you have a 2nd chance at reviewing all the emails before actually deleting them yourself in Gmail. If you wish to move to trash automatically, you can set "move_to_trash" as true. Emails in trash are deleted after 30 days.
+By default, this does **NOT delete** any emails. This is so that you have a 2nd chance at reviewing all the emails before actually deleting them yourself in Gmail. If you wish to move to trash automatically, you can set "move_to_trash" as true. Emails in trash are deleted after 30 days.
 
 ### Supported Conditions
 
@@ -14,7 +14,10 @@ By defualt, this does **NOT delete** any emails. This is so that you have a 2nd 
 | --- | --- |
 | Can Archive Starred | true or false |
 | Can Archive Important | true or false |
+| Move to Trash | true or false.  Instead of archiving, this will move them to trash directly.|
+| Mark as Unimportant | true or false. For some reasons, email sent to trash were all being marked as important. This is to mark them as not. |
 | Labels to Keep | A list of Labels that are applied to emails that should never be archived. Ex: “Bills”, “My Custom Label”, “Tax” |
+
 
 ## Things to Try First
 
